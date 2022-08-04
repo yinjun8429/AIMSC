@@ -1,15 +1,13 @@
-%% »ùÓÚÃª(anchor)µÄ²»ÍêÈ«¶àÊÓ½ÇÆ×¾ÛÀà
-%% ²ÉÓÃ½»Ìæµü´ú·¨Çó½âÑù±¾ºÍÃªµãÖ®¼äµÄÏàËÆ¶È¾ØÕóW£¬ÒªÇóWµÄÔªËØ¾ù´óÓÚ0,Ê¹ÓÃ¶ş´Î¹æ»®Çó½â
-%% maxiterÎª×î´óµü´ú´ÎÊı
-%% stoperrÎªÅĞ¶Ïµü´ú½áÊøµÄÎó²î
-%% alphaÎª¹æÔò»¯²ÎÊı
-%% JÎª×îÖÕÊä³öµÄÄ¿±êº¯ÊıÖµ
-%% los_markÎªÃ¿¸öÊÓ½ÇÖĞÈ±Ê§Êı¾İÑù±¾µÄ±àºÅ
-%% data_eÎª´æÔÚÊı¾İÑù±¾£¬ori_WÊÇ³õÊ¼µÄW,data_numÎª×ÜµÄÊı¾İÑù±¾Êı£¨°üÀ¨È±Ê§Ñù±¾£©
-%% alphaµÄÉè¶¨ÓĞ¼¼ÇÉ
-%% ½«ËùÓĞ²ÎÊıÍ³Ò»ÓÚ½á¹¹ÌåoptionsÖĞ
-%% ×îÓÅ»¯Ä¿±ê£º min{Xv,W}SUMv=1~V||Xv-Av*W||^2+alpha||W||^2  s.t.Xv*SEv = XEv, W'1=1,  W>=0(1ÎªÔªËØ¾ùÎª1µÄÁĞÏòÁ¿)
+%% data: complete data matrix
+%% W: similarity matrix between data points and anchor points 
+%% new_data: new data obtained by AIMSC 
+%% J: value of objective function
+%% data_e: existing data matrixï¼Œanc_data: anchor data matrix, ori_W: original W, los_mark: index number of missing data
+%% options is a struct combined by alpha, maxiter, stoperr and new_dim,   
+%% alpha: regularization parameter, maxiter: the maximum number of iteration,  stoperr: threshold of iteration stop,  new_dim: dimension of new_data
+%% objective functionï¼š min{Xv,W}SUMv=1~V||Xv-Av*W||^2+alpha||W||^2  s.t.Xv*SEv = XEv, W'1=1,  W>=0
 %%
+
 function [data,W,new_data,J] = AIMSC(data_e,anc_data,ori_W,los_mark,options)
 
 alpha = options.alpha;
@@ -18,21 +16,17 @@ stoperr = options.stoperr;
 new_dim = options.new_dim;
 
 view_num = length(data_e);
-[anc_num,data_num] = size(ori_W); %%anc_numÎªÃªµãµÄ¸öÊı
-dim = zeros(1,view_num); %¼ÇÂ¼Ã¿¸öÊÓ½ÇÎ¬ÊıµÄÏòÁ¿
-tq_l = cell(1,view_num);  %È±Ê§ÌáÈ¡¾ØÕó 
-% tq_e = cell(1,view_num);  %´æÔÚÌáÈ¡¾ØÕó
-kz_l = cell(1,view_num); %È±Ê§À©Õ¹¾ØÕó
-kz_e = cell(1,view_num); %´æÔÚÀ©Õ¹¾ØÕó
-% W = cell(1,view_num); %Ã¿¸öÊÓ½ÇÑù±¾ºÍÃªµã¼äµÄÏàËÆ¾ØÕó
-tot_mark = 1:data_num;   %×ÜÊı¾İ±êÇ©
-% data_e = cell(1,view_num); %Ã¿¸öÊÓ½ÇµÄ´æÔÚÑù±¾¾ØÕó
-% data_l = cell(1,view_num);  %Ã¿¸öÊÓ½ÇµÄÈ±Ê§Ñù±¾¾ØÕó
-data = cell(1,view_num);  %Ã¿¸öÊÓ½ÇµÄÍêÕûÑù±¾¾ØÕó
+[anc_num,data_num] = size(ori_W); %% number of anchors
+dim = zeros(1,view_num); 
+tq_l = cell(1,view_num);  
+kz_l = cell(1,view_num); 
+kz_e = cell(1,view_num); 
+tot_mark = 1:data_num;   
+data = cell(1,view_num);  % complete data matrix of each view
 
 sum_dim = 0;
 
-%% ¶ş´Î¹æ»®µÄÊäÈë²ÎÊı
+%% parameters of quadratic programming
 f = zeros(anc_num,1);
 A = [];
 b = [];
@@ -45,44 +39,39 @@ ub = [];
 for view_mark = 1:view_num    
     [dim(view_mark),~] = size(data_e{view_mark});
     sum_dim = sum_dim+dim(view_mark);
-    los_mark{view_mark} = sort(los_mark{view_mark});  %½«È±Ê§Ñù±¾µÄ±êÇ©°´Ë³ĞòÅÅÁĞ
-%      tq_e{view_mark} = eye(data_num);
-%      tq_e{view_mark}(:,los_mark{view_mark}) = [];
+    los_mark{view_mark} = sort(los_mark{view_mark});  
      ext_mark = setdiff(tot_mark,los_mark{view_mark});
      tq_l{view_mark} = eye(data_num);
      tq_l{view_mark}(:,ext_mark) = [];
-     l_num = length(los_mark{view_mark}); %Ã¿¸öÊÓ½ÇÈ±Ê§Ñù±¾µÄ¸öÊı
-     e_num = data_num - l_num;  %Ã¿¸öÊÓ½Ç´æÔÚÑù±¾µÄ¸öÊı
+     l_num = length(los_mark{view_mark}); % number of missing data of each view
+     e_num = data_num - l_num;  % number of existing data of each view
      kz_l{view_mark} = zeros(l_num,data_num);
      kz_l{view_mark}(:,los_mark{view_mark}) = eye(l_num);
      kz_e{view_mark} = zeros(e_num,data_num);
      kz_e{view_mark}(:,ext_mark) = eye(e_num);
-%     data_e{view_mark} = data_t{view_mark}*tq_e{view_mark};
 end
 alpha = alpha*sum_dim/anc_num;
 
-%%%%½«ÏàËÆ¶È¾ØÕóÉèÎª³õÊ¼Öµ
+%%%% initialize W
 W = ori_W;  
 %%%%
 
-%% µü´úÇó½âÏàËÆ¶È¾ØÕóWºÍÍêÕûÑù±¾¾ØÕódata
+%% obtain W and data by iteration
 J = zeros(maxiter,1);
-for it_mark = 1:maxiter   %%µü´úÇó½â
-     %%%%¸üĞÂÍêÕûÑù±¾¾ØÕó      ´Ë´¦¶ÔÓ¦ÓÚÂÛÎÄÖĞµÄ X(v)=Z(v)+Y(v),
-     %%%%              74ĞĞÖĞ¼ÓºÅµÄÇ°Ãæ²¿·Ö¶ÔÓ¦Z(v)£¬¼ÓºÅµÄºóÃæ²¿·Ö¶ÔÓ¦Y(v)
+for it_mark = 1:maxiter   
+     %%%% update data
      for view_mark = 1:view_num
           data{view_mark} = anc_data{view_mark}*W*tq_l{view_mark}*kz_l{view_mark}+data_e{view_mark}*kz_e{view_mark};
      end
      %%%%
      
-   %%%%¸üĞÂÏàËÆ¶È¾ØÕó(ĞèÒªÒ»ÁĞÒ»ÁĞµØ¼ÆËã£¬Ã¿ÁĞ¶ÔÓ¦Ò»¸öÑù±¾µÄÏàËÆ¶È)
+   %%%% update W
    for data_mark = 1:data_num
        temp_G = 0;
        for view_mark = 1:view_num
           temp_G = temp_G + (data{view_mark}(:,data_mark)*ones(1,anc_num)-anc_data{view_mark})'*(data{view_mark}(:,data_mark)*ones(1,anc_num)-anc_data{view_mark});
        end
-%        W(:,data_mark) = inv(temp_G+alpha*eye(anc_num))*ones(anc_num,1)/(ones(1,anc_num)*inv(temp_G+alpha*eye(anc_num))*ones(anc_num,1));
-       W(:,data_mark) = quadprog(2*(temp_G+alpha*eye(anc_num)),f,A,b,Aeq,beq,lb,ub);  %%Ê¹ÓÃ¶ş´Î¹æ»®Çó½â
+       W(:,data_mark) = quadprog(2*(temp_G+alpha*eye(anc_num)),f,A,b,Aeq,beq,lb,ub);  %% sovle W by quadratic programming
    end
    %%%% 
     
@@ -90,58 +79,24 @@ for it_mark = 1:maxiter   %%µü´úÇó½â
         J(it_mark) = J(it_mark)+trace((data{view_mark}-anc_data{view_mark}*W)*(data{view_mark}-anc_data{view_mark}*W)');
     end
     J(it_mark) = J(it_mark)+alpha*trace(W*W');
-    if it_mark>=2 && abs((J(it_mark)-J(it_mark-1))/J(it_mark-1))< stoperr        %% ÊÕÁ²Ôò½áÊø±¾´Îµü´ú
+    if it_mark>=2 && abs((J(it_mark)-J(it_mark-1))/J(it_mark-1))< stoperr       
           break;
     end
 end
 %%
 
-% %%%%Ê¹ÓÃÌØÕ÷Öµ·Ö½âÇó½â
-% %%ËùÓĞÑù±¾¼äµÄÏàËÆ¶È¾ØÕó
-% %%
-% S = W'*inv(diag(sum(W,2)))*W;
-% %%
-% 
-% [vec,val] = eig(S);
-% [sort_val,index] = sort(diag(val),'descend');
-% sort_vec = vec(:,index);
-% new_data = sort_vec(:,2:new_dim+1);
-% % new_data = sort_vec(:,1:new_dim);
-% %%%%
 
-% %%%%Ê¹ÓÃÆæÒìÖµ·Ö½âÇó½â
-% [U,val,V] = svd(W'*diag(sum(W,2))^-0.5,'econ');
-% [sort_val,index] = sort(diag(val^2),'descend');
-% sort_vec = U(:,index);
-% new_data = sort_vec(:,2:new_dim+1);
-% % new_data = sort_vec(:,1:new_dim);
-% %%%%
-
-% %%%%Ê¹ÓÃ¿ìËÙÌØÕ÷Öµ·Ö½â£¨Í¨¹ı·Ö½âĞ¡¾ØÕóµÃµ½´ó¾ØÕóµÄÌØÕ÷·Ö½â½á¹û£©Çó½â
+% %%%% fast eigenvalue decompsition
 SS = diag(sum(W,2))^-0.5*W*W'*diag(sum(W,2))^-0.5;
 [vec,val] = eig(SS);
 [sort_val,index] = sort(diag(val),'descend');
 sort_vec = vec(:,index);
-% need_val = diag(sort_val(2:new_dim+1));
-% need_vec = sort_vec(:,2:new_dim+1);
 need_val = diag(sort_val(1:new_dim));
 need_vec = sort_vec(:,1:new_dim);
 new_data = W'*diag(sum(W,2))^-0.5*need_vec*(need_val^-0.5);
-% new_data = sort_vec(:,1:new_dim);
 % %%%%
 
+ norm_new_data = repmat(sqrt(sum(new_data.*new_data,2)),1,size(new_data,2));
+ norm_new_data = max(norm_new_data,1e-10);   %% avoid divide by zero
+ new_data = new_data./norm_new_data;
 
- %%%%°ÑÃ¿Ò»Ñù±¾ĞÂ±íÊ¾µÄ2·¶Êı»¯Îª1
-    norm_new_data = repmat(sqrt(sum(new_data.*new_data,2)),1,size(new_data,2));
-    %%avoid divide by zero
-   norm_new_data = max(norm_new_data,1e-10);
-%   norm_new_data(norm_new_data==0) = 1;
-   new_data = new_data./norm_new_data;
- %%%%
-
-%  %%%%%Ç¶Èë¾ØÕóÃ¿Ò»ĞĞµÄ2·¶Êı»¯Îª1
-%     norm_new_data = repmat(sqrt(sum(new_data.*new_data,2)),1,size(new_data,2));
-%     %%avoid divide by zero
-%    norm_new_data = max(norm_new_data,1e-10);
-%    new_data = new_data./norm_new_data;
-%  %%%%%
